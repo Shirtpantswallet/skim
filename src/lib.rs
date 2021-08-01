@@ -41,6 +41,7 @@ mod query;
 mod reader;
 mod selection;
 mod spinlock;
+mod suggester;
 mod theme;
 mod util;
 
