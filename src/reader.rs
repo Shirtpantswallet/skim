@@ -100,7 +100,7 @@ impl Reader {
     }
 }
 
-fn collect_item(
+pub fn collect_item(
     components_to_stop: Arc<AtomicUsize>,
     rx_item: SkimItemReceiver,
     items: Arc<SpinLock<Vec<Arc<dyn SkimItem>>>>,
