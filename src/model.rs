@@ -839,7 +839,17 @@ impl Model {
             .margin_bottom(self.margin_bottom)
             .margin_left(self.margin_left);
 
-        action(Box::new(root))
+        let stacked_main = Stack::new()
+            .top(Win::new(MyModel("test".to_string()))
+                .border(true)
+                .margin_left(Size::Percent(10))
+                .margin_right(Size::Percent(20))
+                .margin_top(Size::Fixed(3))
+                .margin_bottom(Size::Percent(80)))
+            .bottom(root);
+
+        action(Box::new(stacked_main))
+        //action(Box::new(root))
     }
 }
 
@@ -950,6 +960,26 @@ impl Draw for Status {
         canvas.print_with_attr(0, screen_width - line_num_str.len(), &line_num_str, info_attr_bold)?;
 
         Ok(())
+    }
+}
+
+struct MyModel(String);
+
+impl Draw for MyModel {
+    fn draw(&self, canvas: &mut dyn Canvas) -> DrawResult<()> {
+        // let (width, height) = canvas.size()?;
+        // let message_width = self.0.len();
+        canvas.clear()?;
+        let left = 0;
+        let top = 0;
+        let _ = canvas.print(top, left, &self.0);
+        Ok(())
+    }
+}
+
+impl<'a, Message> Widget<Message> for MyModel {
+    fn size_hint(&self) -> (Option<usize>, Option<usize>) {
+        (Some(2), Some(2))
     }
 }
 
