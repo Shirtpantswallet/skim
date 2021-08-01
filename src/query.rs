@@ -1,7 +1,7 @@
 use std::mem;
 use std::sync::Arc;
 
-use tuikit::prelude::*;
+use tuikit::prelude::{Event as TermEvent, *};
 use unicode_width::UnicodeWidthStr;
 
 use crate::event::{Event, EventHandler, UpdateScreen};
@@ -452,7 +452,16 @@ impl EventHandler for Query {
                 None => self.act_add_char(*ch),
             },
 
-            EvActDeleteChar | EvActDeleteCharEOF => {
+            EvActAutocompleteBegin => {
+                for ch in "began autocomplete".chars() {
+                                    self.act_add_char(ch);
+                }
+            },
+
+            EvActAutocompleteNext
+            | EvActAutocompletePrevious
+            | EvActAutocompleteSelect
+            | EvActDeleteChar | EvActDeleteCharEOF => {
                 self.act_delete_char();
             }
 
@@ -563,6 +572,40 @@ impl Widget<Event> for Query {
         let after = self.get_after();
         let prompt = self.get_prompt();
         (Some(prompt.width() + before.width() + after.width() + 1), None)
+    }
+    fn on_event(&self, event: TermEvent, _rect: Rectangle) -> Vec<Event> {
+        let mut ret = vec![];
+        match event {
+            TermEvent::Key(Key::Tab) => ret.push(Event::EvActAutocompleteBegin),
+            _ => {}
+        }
+        ret
+    }
+}
+
+pub struct AutocompletionSuggestions {
+    suggestions: Vec<Vec<char>>,
+    current: Option<usize>
+}
+
+impl AutocompletionSuggestions {
+    pub fn empty() -> Self {
+        Self {
+            suggestions: vec![],
+            current: None,
+        }
+    }
+
+    pub fn lines_of_suggestions(&self) -> usize {
+        self.suggestions.len()
+    }
+
+    pub fn get_width(&self) -> usize {
+        self.suggestions.iter()
+            .map(|s| s.len())
+            .fold(0, |a, b| {
+                a.max(b)
+            })
     }
 }
 
