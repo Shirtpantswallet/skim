@@ -3,12 +3,12 @@ use crate::global::mark_new_run;
 
 use crate::options::SkimOptions;
 use crate::spinlock::SpinLock;
-use crate::reader::{collect_item, CommandCollector, Reader, ReaderControl};
+use crate::reader::{collect_item, CommandCollector,};
 use crate::{SkimItem, SkimItemReceiver};
-use crossbeam::channel::{bounded, select, Sender};
+use crossbeam::channel::Sender;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize,Ordering};
 use std::sync::Arc;
 
 pub struct SuggesterControl {
@@ -16,6 +16,31 @@ pub struct SuggesterControl {
     tx_interrupt_cmd: Option<Sender<i32>>,
     components_to_stop: Arc<AtomicUsize>,
     items: Arc<SpinLock<Vec<Arc<dyn SkimItem>>>>,
+}
+
+impl SuggesterControl {
+    pub fn kill(self) {
+        debug!(
+            "kill suggerter, compontents before {}",
+            self.components_to_stop.load(Ordering::SeqCst)
+        );
+
+        let _ = self.tx_interrupt_cmd.map(|tx| tx.send(1));
+        let _ = self.tx_interrupt.send(1);
+        while self.components_to_stop.load(Ordering::SeqCst) != 0 {}
+    }
+
+    pub fn take(&self) -> Vec<Arc<dyn SkimItem>> {
+        let mut items = self.items.lock();
+        let mut ret = Vec::with_capacity(items.len());
+        ret.append(&mut items);
+        ret
+    }
+
+    pub fn is_done(&self) -> bool {
+        let items = self.items.lock();
+        self.components_to_stop.load(Ordering::SeqCst) == 0 && items.is_empty()
+    }
 }
 
 pub struct Suggester {

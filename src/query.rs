@@ -583,32 +583,6 @@ impl Widget<Event> for Query {
     }
 }
 
-pub struct AutocompletionSuggestions {
-    suggestions: Vec<Vec<char>>,
-    current: Option<usize>
-}
-
-impl AutocompletionSuggestions {
-    pub fn empty() -> Self {
-        Self {
-            suggestions: vec![],
-            current: None,
-        }
-    }
-
-    pub fn lines_of_suggestions(&self) -> usize {
-        self.suggestions.len()
-    }
-
-    pub fn get_width(&self) -> usize {
-        self.suggestions.iter()
-            .map(|s| s.len())
-            .fold(0, |a, b| {
-                a.max(b)
-            })
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::Query;
