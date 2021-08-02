@@ -26,6 +26,7 @@ use crate::query::Query;
 use crate::reader::{Reader, ReaderControl};
 use crate::selection::Selection;
 use crate::spinlock::SpinLock;
+use crate::suggester::{Suggester,SuggesterControl};
 use crate::theme::ColorTheme;
 use crate::util::{depends_on_items, inject_command, margin_string_to_size, parse_margin, InjectContext};
 use crate::{FuzzyAlgorithm, MatchEngineFactory, MatchRange, SkimItem};
@@ -47,6 +48,7 @@ lazy_static! {
 
 pub struct Model {
     reader: Reader,
+    suggester: Suggester,
     query: Query,
     selection: Selection,
     num_options: usize,
@@ -67,8 +69,10 @@ pub struct Model {
 
     fuzzy_algorithm: FuzzyAlgorithm,
     reader_timer: Instant,
+    suggester_timer: Instant,
     matcher_timer: Instant,
     reader_control: Option<ReaderControl>,
+    suggester_control: Option<SuggesterControl>,
     matcher_control: Option<MatcherControl>,
 
     header: Header,
@@ -98,7 +102,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(rx: EventReceiver, tx: EventSender, reader: Reader, term: Arc<Term>, options: &SkimOptions) -> Self {
+    pub fn new(rx: EventReceiver, tx: EventSender, reader: Reader, suggester: Suggester, term: Arc<Term>, options: &SkimOptions) -> Self {
         let default_command = match env::var("SKIM_DEFAULT_COMMAND").as_ref().map(String::as_ref) {
             Ok("") | Err(_) => "find .".to_owned(),
             Ok(val) => val.to_owned(),
@@ -150,6 +154,7 @@ impl Model {
 
         let mut ret = Model {
             reader,
+            suggester,
             query,
             selection,
             num_options: 0,
@@ -165,8 +170,10 @@ impl Model {
             rx,
             tx,
             reader_timer: Instant::now(),
+            suggester_timer: Instant::now(),
             matcher_timer: Instant::now(),
             reader_control: None,
+            suggester_control: None,
             matcher_control: None,
             fuzzy_algorithm: FuzzyAlgorithm::default(),
 
@@ -365,9 +372,10 @@ impl Model {
 
         let items_consumed = self.item_pool.num_not_taken() == 0;
         let reader_stopped = self.reader_control.as_ref().map(|c| c.is_done()).unwrap_or(true);
+        let suggester_stopped = self.suggester_control.as_ref().map(SuggesterControl::is_done).unwrap_or(true);
         let matcher_stopped = self.matcher_control.as_ref().map(|ctrl| ctrl.stopped()).unwrap_or(true);
 
-        let processed = reader_stopped && items_consumed && matcher_stopped;
+        let processed = reader_stopped && items_consumed && matcher_stopped && suggester_stopped;
         let num_matched = self.selection.get_num_options();
         if processed {
             if num_matched == 1 && self.select1 {
@@ -391,6 +399,9 @@ impl Model {
         if let Some(ctrl) = self.reader_control.take() {
             ctrl.kill();
         }
+        if let Some(ctrl) = self.suggester_control.take() {
+            ctrl.kill();
+        }
         if let Some(ctrl) = self.matcher_control.take() {
             ctrl.kill();
         }
@@ -401,6 +412,7 @@ impl Model {
 
         // restart reader
         self.reader_control.replace(self.reader.run(&env.cmd));
+        self.suggester_control.replace(self.suggester.run(&env.cmd));
         self.restart_matcher();
         self.reader_timer = Instant::now();
     }
@@ -497,6 +509,7 @@ impl Model {
         };
 
         self.reader_control = Some(self.reader.run(&env.cmd));
+        self.suggester_control = Some(self.suggester.run(&env.cmd));
 
         // In the event loop, there might need
         let mut next_event = Some((Key::Null, Event::EvHeartBeat));
@@ -548,6 +561,9 @@ impl Model {
                     if let Some(ctrl) = self.reader_control.take() {
                         ctrl.kill();
                     }
+                    if let Some(ctrl) = self.suggester_control.take() {
+                        ctrl.kill();
+                    }
                     if let Some(ctrl) = self.matcher_control.take() {
                         ctrl.kill();
                     }
@@ -564,6 +580,9 @@ impl Model {
 
                 Event::EvActAbort => {
                     if let Some(ctrl) = self.reader_control.take() {
+                        ctrl.kill();
+                    }
+                    if let Some(ctrl) = self.suggester_control.take() {
                         ctrl.kill();
                     }
                     if let Some(ctrl) = self.matcher_control.take() {
@@ -839,13 +858,33 @@ impl Model {
             .margin_bottom(self.margin_bottom)
             .margin_left(self.margin_left);
 
+        let floating_query = Win::new(&self.query)
+                                .basis(if self.inline_info { 0 } else { 1 })
+                                .grow(0)
+                                .shrink(0)
+                                .border(false);
+
+        let floating_suggestions = Win::new(&self.query)
+                                .basis(1)
+                                .grow(1)
+                                .shrink(0)
+                                .border(true);
+        let float_main = match layout {
+            "reverse" => Box::new(VSplit::default()
+                            .split(floating_query)
+                            .split(floating_suggestions)),
+            _ => Box::new(VSplit::default()
+                    .split(floating_suggestions)
+                    .split(floating_query)),
+        };
         let stacked_main = Stack::new()
-            .top(Win::new(MyModel("test".to_string()))
-                .border(true)
-                .margin_left(Size::Percent(10))
-                .margin_right(Size::Percent(20))
-                .margin_top(Size::Fixed(3))
-                .margin_bottom(Size::Percent(80)))
+            .top(Win::new(float_main).margin_top(Size::Percent(90)))
+            //.top(Win::new(MyModel("test".to_string()))
+            //    .border(true)
+            //    .margin_left(Size::Percent(10))
+            //    .margin_right(Size::Percent(20))
+            //    .margin_top(Size::Fixed(3))
+            //    .margin_bottom(Size::Percent(80)))
             .bottom(root);
 
         action(Box::new(stacked_main))

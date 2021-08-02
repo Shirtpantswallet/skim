@@ -20,6 +20,7 @@ use crate::model::Model;
 pub use crate::options::SkimOptions;
 pub use crate::output::SkimOutput;
 use crate::reader::Reader;
+use crate::suggester::Suggester;
 
 mod ansi;
 mod engine;
@@ -347,9 +348,14 @@ impl Skim {
 
         let reader = Reader::with_options(&options).source(source);
 
+
+        //------------------------------------------------------------------------------
+        // suggester
+        let suggester = Suggester::with_options(&options).source(None);
+
         //------------------------------------------------------------------------------
         // model + previewer
-        let mut model = Model::new(rx, tx, reader, term.clone(), &options);
+        let mut model = Model::new(rx, tx, reader, suggester, term.clone(), &options);
         let ret = model.start();
         let _ = term.send_event(TermEvent::User(())); // interrupt the input thread
         let _ = input_thread.join();

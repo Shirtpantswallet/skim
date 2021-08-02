@@ -17,6 +17,9 @@ enum QueryMode {
 pub struct Query {
     cmd_before: Vec<char>,
     cmd_after: Vec<char>,
+    // sugg_before should just be equal to cmd_before, whereas sugg_after shouln't exist
+    // Rather, the selected suggestion should replace cmd_after (and overlapping parts of
+    // cmd_before)  
     fz_query_before: Vec<char>,
     fz_query_after: Vec<char>,
     yank: Vec<char>,
