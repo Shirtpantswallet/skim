@@ -859,16 +859,19 @@ impl Model {
             .margin_left(self.margin_left);
 
         let floating_query = Win::new(&self.query)
-                                .basis(if self.inline_info { 0 } else { 1 })
-                                .grow(0)
-                                .shrink(0)
-                                .border(false);
+                                //.basis(if self.inline_info { 0 } else { 1 })
+                                .basis(1)
+                                .grow(1)
+                                .shrink(1)
+                                .border_bottom(true);
 
         let floating_suggestions = Win::new(&self.query)
                                 .basis(1)
-                                .grow(1)
-                                .shrink(0)
-                                .border(true);
+                                .grow(5)
+                                .shrink(1)
+                                .border_top(true)
+                                .border_left(true)
+                                .border_right(true);
         let float_main = match layout {
             "reverse" => Box::new(VSplit::default()
                             .split(floating_query)
@@ -878,7 +881,7 @@ impl Model {
                     .split(floating_query)),
         };
         let stacked_main = Stack::new()
-            .top(Win::new(float_main).margin_top(Size::Percent(90)))
+            .top(Win::new(float_main).padding_top(Size::Percent(80)))
             //.top(Win::new(MyModel("test".to_string()))
             //    .border(true)
             //    .margin_left(Size::Percent(10))
