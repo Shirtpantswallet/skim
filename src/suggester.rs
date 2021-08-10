@@ -4,12 +4,15 @@ use crate::global::mark_new_run;
 use crate::options::SkimOptions;
 use crate::spinlock::SpinLock;
 use crate::reader::{collect_item, CommandCollector,};
+use crate::query::Query;
 use crate::{SkimItem, SkimItemReceiver};
+use crate::theme::{ColorTheme, DEFAULT_THEME};
 use crossbeam::channel::Sender;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize,Ordering};
 use std::sync::Arc;
+use tuikit::prelude::{Event as TermEvent, *};
 
 pub struct SuggesterControl {
     tx_interrupt: Sender<i32>,
@@ -83,5 +86,22 @@ impl Suggester {
             components_to_stop,
             items,
         }
+    }
+}
+
+pub struct CompletionQuery<'a> {
+    query: &'a Query,
+    theme: Arc<ColorTheme>,
+}
+
+impl <'a> Draw for CompletionQuery <'_> {
+    fn draw(&self, canvas: &mut dyn Canvas) -> DrawResult<()> {
+        canvas.clear()?;
+        let cmd = self.query.get_cmd_query();
+
+        let before_width = canvas.print_with_attr(0, 0, &cmd, self.theme.query())?;
+        //canvas.set_cursor(0, before_width)?;
+        //canvas.show_cursor(true)?;
+        Ok(())
     }
 }
